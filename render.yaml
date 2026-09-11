@@ -1,0 +1,51 @@
+databases:
+  - name: duty-monitoring-db
+    databaseName: duty_monitoring
+    user: duty_monitoring
+    plan: free
+
+services:
+  - type: web
+    name: duty-monitoring-web
+    runtime: docker
+    rootDir: website-log-duty
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /up
+    envVars:
+      - key: APP_NAME
+        value: 969 Duty Monitoring
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        generateValue: true
+      - key: APP_URL
+        sync: false
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: duty-monitoring-db
+          property: connectionString
+      - key: SESSION_DRIVER
+        value: file
+      - key: CACHE_STORE
+        value: file
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: DISCORD_BOT_AUTOSTART
+        value: "false"
+
+  - type: worker
+    name: duty-monitoring-bot
+    runtime: docker
+    rootDir: discord-bot
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: DUTY_CHANNEL_ID
+        sync: false
+      - key: LARAVEL_API
+        sync: false
