@@ -51,6 +51,31 @@ function parseDate(value) {
     return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+function getApiUrl() {
+    const apiUrl = process.env.LARAVEL_API?.trim();
+    if (!apiUrl) {
+        console.error('❌ Error konfigurasi: LARAVEL_API belum diatur.');
+        return null;
+    }
+
+    try {
+        const url = new URL(apiUrl);
+        if (!['http:', 'https:'].includes(url.protocol)) throw new Error('protocol tidak didukung');
+        return url.toString();
+    } catch (error) {
+        console.error(`❌ Error konfigurasi: LARAVEL_API tidak valid (${error.message}).`);
+        return null;
+    }
+}
+
+function wait(milliseconds) {
+    return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+function isRetryableError(error) {
+    return !error.response || error.response.status >= 500;
+}
+
 function getMessageValues(message) {
     const values = new Map();
 
@@ -153,26 +178,56 @@ function parseDutyLog(message) {
 
 async function syncMessage(message) {
     const dutyLog = parseDutyLog(message);
-    if (!dutyLog) return;
+    if (!dutyLog) return 'invalid';
 
-    const apiUrl = process.env.LARAVEL_API?.trim();
-    if (!apiUrl) {
-        console.error('❌ Error konfigurasi: LARAVEL_API belum diatur.');
-        return;
+    const apiUrl = getApiUrl();
+    if (!apiUrl) return 'failed';
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            await axios.post(apiUrl, dutyLog, {
+                timeout: 10000,
+                headers: { Accept: 'application/json' },
+            });
+            const action = dutyLog.status === 'on_duty' ? 'masuk' : 'selesai';
+            console.log(`✅ Duty ${action}: ${dutyLog.player_name}`);
+            return 'saved';
+        } catch (error) {
+            if (!isRetryableError(error) || attempt === 3) {
+                const detail = error.response?.data?.message
+                    || (error.response?.data?.errors && JSON.stringify(error.response.data.errors))
+                    || error.message;
+                console.error(`❌ Error database untuk ${dutyLog.player_name}: ${detail}`);
+                return 'failed';
+            }
+
+            await wait(attempt * 2000);
+        }
     }
+}
 
-    try {
-        await axios.post(apiUrl, dutyLog, {
-            timeout: 10000,
-            headers: { Accept: 'application/json' },
-        });
-        const action = dutyLog.status === 'on_duty' ? 'masuk' : 'selesai';
-        console.log(`✅ Duty ${action}: ${dutyLog.player_name}`);
-    } catch (error) {
-        const detail = error.response?.data?.message
-            || JSON.stringify(error.response?.data?.errors || {})
-            || error.message;
-        console.error(`❌ Error database untuk ${dutyLog.player_name}: ${detail}`);
+async function getStoredMessageIds() {
+    const apiUrl = getApiUrl();
+    if (!apiUrl) return null;
+
+    for (let attempt = 1; attempt <= 6; attempt++) {
+        try {
+            const response = await axios.get(apiUrl, {
+                params: { message_ids: 1 },
+                timeout: 10000,
+                headers: { Accept: 'application/json' },
+            });
+
+            return new Set(response.data?.data || []);
+        } catch (error) {
+            if (!isRetryableError(error) || attempt === 6) {
+                const detail = error.response?.data?.message || error.message;
+                console.error(`❌ Error database saat membaca log tersimpan: ${detail}`);
+                return null;
+            }
+
+            await wait(Math.min(attempt * 5000, 15000));
+        }
     }
 }
 
@@ -189,10 +244,16 @@ client.once('ready', async () => {
             return;
         }
 
-        const cutoffDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const cutoffDate = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+        const storedMessageIds = await getStoredMessageIds();
+        if (!storedMessageIds) return;
 
         let lastId = null;
         let totalPesan = 0;
+        let skippedPesan = 0;
+        let savedPesan = 0;
+        let invalidPesan = 0;
+        let failedPesan = 0;
         let reachedCutoff = false;
 
         while (true) {
@@ -217,7 +278,18 @@ client.once('ready', async () => {
                 }
 
                 totalPesan++;
-                await syncMessage(message);
+                if (storedMessageIds.has(message.id)) {
+                    skippedPesan++;
+                    continue;
+                }
+
+                const result = await syncMessage(message);
+                if (result === 'saved') {
+                    storedMessageIds.add(message.id);
+                }
+                if (result === 'invalid') invalidPesan++;
+                if (result === 'saved') savedPesan++;
+                if (result === 'failed') failedPesan++;
             }
 
             if (reachedCutoff) {
@@ -231,7 +303,7 @@ client.once('ready', async () => {
             }
         }
 
-        console.log(`✅ Sinkronisasi selesai: ${totalPesan} pesan diperiksa.`);
+        console.log(`✅ Sinkronisasi selesai: ${totalPesan} diperiksa, ${savedPesan} tersimpan, ${skippedPesan} sudah tercatat, ${invalidPesan} format dilewati, ${failedPesan} gagal.`);
 
     } catch (error) {
         console.error('❌ Error Discord saat membaca channel:');
