@@ -153,39 +153,31 @@ function parseDutyLog(message) {
 
 async function syncMessage(message) {
     const dutyLog = parseDutyLog(message);
-    if (!dutyLog) {
-        console.log(`Pesan ${message.id} dilewati: format duty tidak dikenali.`);
-        return;
-    }
+    if (!dutyLog) return;
 
     const apiUrl = process.env.LARAVEL_API?.trim();
     if (!apiUrl) {
-        console.error('LARAVEL_API belum diatur. Duty log tidak dikirim.');
+        console.error('❌ Error konfigurasi: LARAVEL_API belum diatur.');
         return;
     }
 
     try {
-        const response = await axios.post(apiUrl, dutyLog, {
+        await axios.post(apiUrl, dutyLog, {
             timeout: 10000,
             headers: { Accept: 'application/json' },
         });
-        console.log(`Duty log ${message.id} tersimpan (${response.status}).`);
+        const action = dutyLog.status === 'on_duty' ? 'masuk' : 'selesai';
+        console.log(`✅ Duty ${action}: ${dutyLog.player_name}`);
     } catch (error) {
         const detail = error.response?.data?.message
             || JSON.stringify(error.response?.data?.errors || {})
             || error.message;
-        console.error(`Gagal mengirim duty log ${message.id}: ${detail}`);
+        console.error(`❌ Error database untuk ${dutyLog.player_name}: ${detail}`);
     }
 }
 
 client.once('ready', async () => {
-    console.log('=================================');
-    console.log('969 Duty Monitor');
-    console.log('=================================');
-    console.log(`Bot        : ${client.user.tag}`);
-    console.log(`Channel ID : ${process.env.DUTY_CHANNEL_ID}`);
-    console.log('Status     : ONLINE');
-    console.log('=================================\n');
+    console.log(`✅ Bot online: ${client.user.tag}`);
 
     try {
         const channel = await client.channels.fetch(
@@ -193,15 +185,15 @@ client.once('ready', async () => {
         );
 
         if (!channel) {
-            console.log('Channel tidak ditemukan.');
+            console.error('❌ Error Discord: channel tidak ditemukan.');
             return;
         }
 
-        console.log(`Channel ditemukan: #${channel.name}`);
-        console.log('Mengambil semua pesan...\n');
+        const cutoffDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
         let lastId = null;
         let totalPesan = 0;
+        let reachedCutoff = false;
 
         while (true) {
             const options = {
@@ -219,50 +211,17 @@ client.once('ready', async () => {
             }
 
             for (const message of messages.values()) {
+                if (message.createdAt < cutoffDate) {
+                    reachedCutoff = true;
+                    break;
+                }
+
                 totalPesan++;
-
-                console.log('=================================');
-                console.log(`Message ID : ${message.id}`);
-                console.log(`Author     : ${message.author.tag}`);
-                console.log(`Bot        : ${message.author.bot}`);
-                console.log(`Tanggal    : ${message.createdAt.toLocaleString('id-ID')}`);
-                console.log('---------------------------------');
-
-                if (message.content) {
-                    console.log('CONTENT:');
-                    console.log(message.content);
-                }
-
-                if (message.embeds.length > 0) {
-                    console.log('\nEMBED:');
-
-                    message.embeds.forEach((embed, index) => {
-                        console.log(`\nEmbed ${index + 1}`);
-
-                        if (embed.title) {
-                            console.log('Title:');
-                            console.log(embed.title);
-                        }
-
-                        if (embed.description) {
-                            console.log('Description:');
-                            console.log(embed.description);
-                        }
-
-                        if (embed.fields.length > 0) {
-                            console.log('Fields:');
-
-                            embed.fields.forEach(field => {
-                                console.log(
-                                    `${field.name}: ${field.value}`
-                                );
-                            });
-                        }
-                    });
-                }
-
-                console.log('=================================\n');
                 await syncMessage(message);
+            }
+
+            if (reachedCutoff) {
+                break;
             }
 
             lastId = messages.last().id;
@@ -272,13 +231,10 @@ client.once('ready', async () => {
             }
         }
 
-        console.log('=================================');
-        console.log('SELESAI');
-        console.log(`Total pesan terbaca: ${totalPesan}`);
-        console.log('=================================');
+        console.log(`✅ Sinkronisasi selesai: ${totalPesan} pesan diperiksa.`);
 
     } catch (error) {
-        console.error('Gagal membaca channel:');
+        console.error('❌ Error Discord saat membaca channel:');
         console.error(error);
     }
 });
@@ -288,42 +244,17 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    console.log('\n=================================');
-    console.log('PESAN BARU');
-    console.log('=================================');
-    console.log(`Author : ${message.author.tag}`);
-    console.log(`Bot    : ${message.author.bot}`);
-    console.log(`Tanggal: ${message.createdAt.toLocaleString('id-ID')}`);
-
-    if (message.content) {
-        console.log('\nCONTENT:');
-        console.log(message.content);
+    try {
+        await syncMessage(message);
+    } catch (error) {
+        console.error('❌ Error Discord saat memproses pesan baru:');
+        console.error(error);
     }
-
-    if (message.embeds.length > 0) {
-        console.log('\nEMBED:');
-
-        message.embeds.forEach((embed, index) => {
-            console.log(`\nEmbed ${index + 1}`);
-
-            console.log('Title:', embed.title || '-');
-            console.log('Description:', embed.description || '-');
-
-            if (embed.fields.length > 0) {
-                embed.fields.forEach(field => {
-                    console.log(`${field.name}: ${field.value}`);
-                });
-            }
-        });
-    }
-
-    console.log('=================================\n');
-    await syncMessage(message);
 });
 
 if (require.main === module) {
     if (!process.env.DISCORD_TOKEN || !process.env.DUTY_CHANNEL_ID) {
-        console.error('DISCORD_TOKEN dan DUTY_CHANNEL_ID wajib diatur di file .env.');
+        console.error('❌ Error konfigurasi: DISCORD_TOKEN dan DUTY_CHANNEL_ID wajib diatur.');
         process.exitCode = 1;
     } else {
         client.login(process.env.DISCORD_TOKEN);

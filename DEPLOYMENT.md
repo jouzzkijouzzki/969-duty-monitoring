@@ -23,6 +23,25 @@ This repository is prepared for a two-service deployment:
 
 The bot token must only be entered in the provider's secret environment settings. Never commit it to GitHub.
 
+## Railway / Railpack
+
+Railway must create two services from this monorepo. The repository root is not an application, so do not deploy it with `/` as the service root.
+
+Create the services with these settings:
+
+| Service | Root Directory | Builder |
+| --- | --- | --- |
+| Web | `/website-log-duty` | Dockerfile |
+| Discord bot | `/discord-bot` | Dockerfile |
+
+Both folders contain a `railway.json` that selects Dockerfile builds. If Railway still shows Railpack analyzing the repository root, open the service's **Settings > Source** and set its Root Directory before redeploying.
+
+Note: `website-log-duty` is a separate nested Git repository in this workspace. Commit and push its `railway.json` to the website repository first, then commit the updated website pointer in the parent repository. The parent repository must point to the commit that contains this file.
+
+For the web service, configure `APP_KEY`, `APP_URL`, `APP_ENV=production`, `APP_DEBUG=false`, and the PostgreSQL variables (`DB_CONNECTION=pgsql`, `DB_URL`). The container listens on Railway's `PORT` automatically and exposes `/up` as its health check.
+
+For the bot service, configure `DISCORD_TOKEN`, `DUTY_CHANNEL_ID`, and `LARAVEL_API` with the web service URL, for example `https://your-web-service.up.railway.app/api/duty-logs`.
+
 ## Local behavior
 
 Local `php artisan serve` still starts the bot automatically. Production disables that behavior because the bot runs as its own worker:

@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    DutyLog::purgeOlderThanWeek();
+    DutyLog::purgeOlderThanWindow();
 
     $logsByDiscordId = DutyLog::query()
         ->whereNotNull('discord_id')

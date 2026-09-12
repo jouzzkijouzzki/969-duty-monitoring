@@ -26,10 +26,10 @@ class DutyLog extends Model
         'end_date' => 'datetime',
     ];
 
-    public static function purgeOlderThanWeek(): int
+    public static function purgeOlderThanWindow(): int
     {
         return static::query()
-            ->where('created_at', '<', now()->subDays(7))
+            ->where('created_at', '<', now()->subDays(8))
             ->delete();
     }
 }

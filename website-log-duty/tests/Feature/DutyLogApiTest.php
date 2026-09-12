@@ -64,13 +64,27 @@ class DutyLogApiTest extends TestCase
         ]);
     }
 
-    public function test_logs_older_than_seven_days_are_purged_when_a_log_is_stored(): void
+    public function test_message_ids_endpoint_returns_only_stored_discord_ids(): void
+    {
+        DutyLog::create([
+            'player_name' => 'Budi',
+            'discord_message_id' => '1234567890123456789',
+        ]);
+        DutyLog::create(['player_name' => 'Tanpa ID']);
+
+        $this->getJson('/api/duty-logs?message_ids=1')
+            ->assertOk()
+            ->assertJsonPath('data.0', '1234567890123456789')
+            ->assertJsonCount(1, 'data');
+    }
+
+    public function test_logs_older_than_eight_days_are_purged_when_a_log_is_stored(): void
     {
         $oldLog = DutyLog::create([
             'player_name' => 'Old log',
             'discord_message_id' => 'old-log-123',
         ]);
-        $oldLog->created_at = now()->subDays(8);
+        $oldLog->created_at = now()->subDays(9);
         $oldLog->saveQuietly();
 
         $this->postJson('/api/duty-logs', [
