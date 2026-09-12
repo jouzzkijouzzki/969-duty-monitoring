@@ -100,10 +100,28 @@ class DutyLogApiTest extends TestCase
     {
         DutyLog::create(['player_name' => 'Budi']);
         DutyLog::create(['player_name' => 'Sari']);
+        $token = 'test-csrf-token';
 
-        $this->post('/duty-logs/reset')
+        $this->withSession(['_token' => $token])
+            ->post('/duty-logs/reset', ['_token' => $token])
             ->assertRedirect(route('dashboard'));
 
         $this->assertDatabaseCount('duty_logs', 0);
+    }
+
+    public function test_database_logs_page_displays_saved_logs(): void
+    {
+        DutyLog::create([
+            'player_name' => 'Gala Tama',
+            'status' => 'off_duty',
+            'duration' => 90,
+            'discord_message_id' => '987654321012345678',
+        ]);
+
+        $this->get('/logs')
+            ->assertOk()
+            ->assertSee('Gala Tama')
+            ->assertSee('987654321012345678')
+            ->assertSee('1 jam 30 menit');
     }
 }

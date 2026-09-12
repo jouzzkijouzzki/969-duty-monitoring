@@ -136,6 +136,7 @@
             <nav class="nav">
                 <a href="{{ url('/') }}"><span class="nav-icon">⌂</span>Home</a>
                 <a class="active" href="{{ url('/') }}"><span class="nav-icon">ϟ</span>Duty Log</a>
+                <a href="{{ route('logs.index') }}"><span class="nav-icon">▤</span>Database Logs</a>
                 <a href="{{ route('players.index') }}"><span class="nav-icon">◉</span>Member</a>
                 <a href="{{ route('players.index') }}"><span class="nav-icon">⚙</span>Settings</a>
             </nav>

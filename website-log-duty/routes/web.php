@@ -69,6 +69,16 @@ Route::get('/players', function () {
     ]);
 })->name('players.index');
 
+Route::get('/logs', function () {
+    DutyLog::purgeOlderThanWindow();
+
+    return view('logs', [
+        'logs' => DutyLog::query()
+            ->latest('created_at')
+            ->paginate(50),
+    ]);
+})->name('logs.index');
+
 Route::post('/players', function (Request $request) {
     $validated = $request->validate([
         'player_name' => ['required', 'string', 'max:255'],
