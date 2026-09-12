@@ -1,0 +1,57 @@
+#!/usr/bin/env php
+<?php
+
+use Illuminate\Foundation\Application;
+use Symfony\Component\Console\Input\ArgvInput;
+
+define('LARAVEL_START', microtime(true));
+
+// Register the Composer autoloader...
+require __DIR__.'/vendor/autoload.php';
+
+// Bootstrap Laravel and handle the command...
+/** @var Application $app */
+$app = require_once __DIR__.'/bootstrap/app.php';
+
+$input = new ArgvInput;
+$discordBotProcess = null;
+
+$discordBotAutostart = getenv('DISCORD_BOT_AUTOSTART')
+	?: ($_ENV['DISCORD_BOT_AUTOSTART'] ?? 'true');
+
+if ($input->getFirstArgument() === 'serve'
+	&& filter_var($discordBotAutostart, FILTER_VALIDATE_BOOLEAN)) {
+	$discordBotPath = dirname(__DIR__).'/discord-bot';
+	$discordBotEntry = $discordBotPath.'/index.js';
+	$nullDevice = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
+
+	if (is_file($discordBotEntry)) {
+		$discordBotProcess = proc_open(
+			['node', 'index.js'],
+			[
+				0 => ['file', $nullDevice, 'r'],
+				1 => ['file', 'php://stdout', 'w'],
+				2 => ['file', 'php://stderr', 'w'],
+			],
+			$pipes,
+			$discordBotPath,
+		);
+
+		if (is_resource($discordBotProcess)) {
+			fwrite(STDOUT, "Discord bot started automatically.\n");
+
+			register_shutdown_function(function () use (&$discordBotProcess): void {
+				if (is_resource($discordBotProcess)) {
+					proc_terminate($discordBotProcess);
+					proc_close($discordBotProcess);
+				}
+			});
+		} else {
+			fwrite(STDERR, "Discord bot could not be started.\n");
+		}
+	}
+}
+
+$status = $app->handleCommand($input);
+
+exit($status);
