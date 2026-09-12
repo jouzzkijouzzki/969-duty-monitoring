@@ -32,6 +32,12 @@
         .view-all { border: 1px solid #c9def9; border-radius: 6px; padding: 7px 10px; color: var(--blue); background: #f7fbff; font-size: 12px; cursor: pointer; transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s ease; }
         .view-all:hover { border-color: var(--blue); background: var(--blue-soft); transform: translateY(-2px); }
         .view-all:focus-visible { outline: 3px solid rgba(40, 120, 229, .28); outline-offset: 2px; }
+        .reset-form { margin: 0; }
+        .reset-button { border: 1px solid #f0b8b8; border-radius: 6px; padding: 7px 10px; color: #b42318; background: #fff8f8; font-size: 12px; cursor: pointer; transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s ease; }
+        .reset-button:hover { border-color: #d64545; background: #fff0f0; transform: translateY(-2px); }
+        .reset-button:focus-visible { outline: 3px solid rgba(214, 69, 69, .2); outline-offset: 2px; }
+        .notice { margin-bottom: 18px; padding: 11px 14px; border-radius: 6px; color: #166534; background: #dcfce7; font-size: 12px; }
+        body.dark .reset-button { border-color: #7f4b4b; color: #ffb4b4; background: #33202a; }
         .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 28px; }
         .card { display: flex; align-items: center; gap: 17px; min-height: 90px; padding: 17px; background: #fff; border-radius: 8px; box-shadow: 0 9px 26px rgba(39, 61, 92, .08); transition: transform .2s ease, box-shadow .2s ease; }
         .card:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(39, 61, 92, .14); }
@@ -136,12 +142,15 @@
         </aside>
         <main class="main">
             <div class="topline"><h1>969 RESTO</h1><div class="topline-actions"><span class="online"><span class="online-dot"></span>Realtime synced</span><button class="theme-toggle" type="button" data-theme-toggle>Mode Gelap</button><img class="top-logo" src="{{ asset('969restologo2.png') }}" alt="969 Resto"></div></div>
+            @if(session('success'))
+                <div class="notice">{{ session('success') }}</div>
+            @endif
             <div class="cards">
                 <div class="card"><div class="card-icon">⌂</div><div><div class="card-label">Welcome, Admin</div><div class="card-value">Dashboard 969 Resto</div></div></div>
                 <div class="card"><div class="card-icon">▦</div><div><div class="card-label">TOTAL</div><div class="card-value">{{ $activePlayerCount }} People</div></div></div>
             </div>
             <section class="panel">
-                <div class="panel-head"><div><div class="eyebrow">969R</div><h2>Tabel Duty 969 Resto</h2></div><div class="panel-head-actions"><span>Total Jam Duty</span><button class="view-all" type="button" data-table-toggle>Lihat semua</button></div></div>
+                <div class="panel-head"><div><div class="eyebrow">969R</div><h2>Tabel Duty 969 Resto</h2></div><div class="panel-head-actions"><span>Total Jam Duty</span><button class="view-all" type="button" data-table-toggle>Lihat semua</button><form class="reset-form" method="POST" action="{{ route('duty-logs.reset') }}" onsubmit="return confirm('Hapus semua log duty? Data yang sudah dihapus tidak dapat dikembalikan.')">@csrf<button class="reset-button" type="submit">Reset Log</button></form></div></div>
                 @if($weeklySummary->isEmpty())
                     <div class="empty">Belum ada member aktif. <a href="{{ route('players.index') }}">Kelola Member</a></div>
                 @else

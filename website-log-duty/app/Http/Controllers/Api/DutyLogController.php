@@ -10,6 +10,7 @@ class DutyLogController extends Controller
 {
     public function index()
     {
+        DutyLog::purgeOlderThanWeek();
         $dutyLogs = DutyLog::latest()->get();
 
         return response()->json([
@@ -20,6 +21,8 @@ class DutyLogController extends Controller
 
     public function store(Request $request)
     {
+        DutyLog::purgeOlderThanWeek();
+
         $validated = $request->validate([
             'player_name' => 'required|string|max:255',
             'discord_id' => 'nullable|string|max:30',

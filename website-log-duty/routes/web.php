@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
+    DutyLog::purgeOlderThanWeek();
+
     $logsByDiscordId = DutyLog::query()
         ->whereNotNull('discord_id')
         ->get()
@@ -43,7 +45,13 @@ Route::get('/', function () {
         'recentHistory' => $recentHistory,
         'activePlayerCount' => $weeklySummary->count(),
     ]);
-});
+})->name('dashboard');
+
+Route::post('/duty-logs/reset', function () {
+    $deletedLogs = DutyLog::query()->delete();
+
+    return to_route('dashboard')->with('success', "Reset berhasil. {$deletedLogs} log duty dihapus.");
+})->name('duty-logs.reset');
 
 Route::get('/players', function () {
     $registeredDiscordIds = ActivePlayer::query()->pluck('discord_id');

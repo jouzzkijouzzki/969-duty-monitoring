@@ -63,4 +63,33 @@ class DutyLogApiTest extends TestCase
             'status' => 'off_duty',
         ]);
     }
+
+    public function test_logs_older_than_seven_days_are_purged_when_a_log_is_stored(): void
+    {
+        $oldLog = DutyLog::create([
+            'player_name' => 'Old log',
+            'discord_message_id' => 'old-log-123',
+        ]);
+        $oldLog->created_at = now()->subDays(8);
+        $oldLog->saveQuietly();
+
+        $this->postJson('/api/duty-logs', [
+            'player_name' => 'New log',
+            'discord_message_id' => 'new-log-123',
+        ])->assertCreated();
+
+        $this->assertDatabaseMissing('duty_logs', ['id' => $oldLog->id]);
+        $this->assertDatabaseHas('duty_logs', ['discord_message_id' => 'new-log-123']);
+    }
+
+    public function test_dashboard_reset_deletes_all_duty_logs(): void
+    {
+        DutyLog::create(['player_name' => 'Budi']);
+        DutyLog::create(['player_name' => 'Sari']);
+
+        $this->post('/duty-logs/reset')
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertDatabaseCount('duty_logs', 0);
+    }
 }
